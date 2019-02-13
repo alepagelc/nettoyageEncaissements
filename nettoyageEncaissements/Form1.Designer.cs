@@ -105,6 +105,7 @@
             this.textBoxAdrServeur.Size = new System.Drawing.Size(100, 20);
             this.textBoxAdrServeur.TabIndex = 2;
             this.textBoxAdrServeur.Text = "127.0.0.1";
+            this.textBoxAdrServeur.KeyUp += new System.Windows.Forms.KeyEventHandler(this.textBoxAdrServeur_KeyUp);
             // 
             // textBoxPortServeur
             // 
@@ -113,6 +114,7 @@
             this.textBoxPortServeur.Size = new System.Drawing.Size(70, 20);
             this.textBoxPortServeur.TabIndex = 2;
             this.textBoxPortServeur.Text = "5432";
+            this.textBoxPortServeur.KeyUp += new System.Windows.Forms.KeyEventHandler(this.textBoxPortServeur_KeyUp);
             // 
             // label4
             // 
@@ -161,6 +163,7 @@
             this.textBoxAdrClient.Size = new System.Drawing.Size(100, 20);
             this.textBoxAdrClient.TabIndex = 2;
             this.textBoxAdrClient.Text = "127.0.0.1";
+            this.textBoxAdrClient.KeyUp += new System.Windows.Forms.KeyEventHandler(this.textBoxAdrClient_KeyUp);
             // 
             // textBoxPortClient
             // 
@@ -169,6 +172,7 @@
             this.textBoxPortClient.Size = new System.Drawing.Size(70, 20);
             this.textBoxPortClient.TabIndex = 2;
             this.textBoxPortClient.Text = "5432";
+            this.textBoxPortClient.KeyUp += new System.Windows.Forms.KeyEventHandler(this.textBoxPortClient_KeyUp);
             // 
             // label7
             // 
