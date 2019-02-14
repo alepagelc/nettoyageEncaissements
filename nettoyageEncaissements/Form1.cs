@@ -14,19 +14,25 @@ namespace nettoyageEncaissements
     public partial class Form1 : Form
     {
         logApp monFicLog = new logApp();
-        String loginPG = "postgres";
-        String passPG = "pgpass";
-        String requetes;
-        String paramConnexion;
+        string loginPG = "postgres";
+        string passPG = "pgpass";
+        string requetes;
+        string paramConnexion;
         Boolean mesTests = true;
-        String portServeur;
-        String adrServeur;
-        String portClient;
-        String adrClient;
+        string portServeur;
+        string adrServeur;
+        string portClient;
+        string adrClient;
         private OdbcConnection chaineConnexionListeBases = new OdbcConnection();
         private OdbcCommand mesRequetes;
         private OdbcDataReader retourRequetes;
-        String maintenant = DateTime.Now.ToString("yyMMdd_HHmmss");
+        string maintenant = DateTime.Now.ToString("yyMMdd_HHmmss");
+        List<string> listFacturesClients = new List<string>();
+        List<string> listFacturesServeur = new List<string>();
+        string[] tabFacturesClients;
+        string[] tabFacturesServeur;
+        IEnumerable<string> listFactures = new List<string>();
+        int i = 0;
         
 
         public Form1()
@@ -407,6 +413,100 @@ namespace nettoyageEncaissements
                     }
                 }
             }
+        }
+
+        private void buttonDemarrage_Click(object sender, EventArgs e)
+        {
+            String ficLog = Application.StartupPath + "\\log_" + maintenant + ".txt";
+
+            monFicLog.Log("Traitement côté base client pour récupérer la liste des factures dont le net à payer est inférieur à 0 mais dont le montant d'acompte est tout de même égal à la somme des encaissements versés.", ficLog);
+
+            // Initialisations des paramètres pour le passage de la requête
+            requetes = "SELECT f.id_facture, f.numdoc, f.titre, f.accompte AS Acompte_fact, f.uid FROM facture f WHERE netapayer< 0 AND f.accompte = (SELECT SUM(montant) FROM encaissement e WHERE e.doc_id = f.id_facture AND type_doc like 'F') ORDER BY f.numdoc";
+            paramConnexion = "Driver={PostgreSQL UNICODE};Server=" + textBoxAdrClient.Text + ";Port=" + textBoxPortClient.Text + ";Database=" + comboBoxBaseClient.Text + ";Uid=" + loginPG + ";Pwd=" + passPG + ";";
+
+            using (chaineConnexionListeBases = new OdbcConnection(paramConnexion))
+            {
+                try
+                {
+                    // Passage de la commande
+                    mesRequetes = new OdbcCommand(requetes, chaineConnexionListeBases);
+                    // Ouverture
+                    chaineConnexionListeBases.Open();
+                }
+                catch (Exception ex)
+                {
+                    monFicLog.Log("Erreur de connexion ODBC à la récupération des factures côtés client.", ficLog);
+                    monFicLog.Log(ex.ToString(), ficLog);
+                    mesTests = false;
+                    MessageBox.Show("Erreur à la connexion à la base client.");
+                }
+                finally
+                {
+                    // Exécution si pas d'exception
+                    if (mesTests)
+                    {
+                        // Exécution de la requête
+                        retourRequetes = mesRequetes.ExecuteReader();
+
+                        i = 0;
+
+                        // Tant qu'il y a des données retournées par la requête
+                        while (retourRequetes.Read())
+                        {
+                            tabFacturesClients[i] = retourRequetes["f.uid"].ToString();
+                            //listFacturesClients.Add(retourRequetes["f.uid"].ToString());
+                            monFicLog.Log("Facture n°" + retourRequetes["f.numdoc"].ToString() + " identifiée comme ayant un encaissement de trop.", ficLog);
+
+                            i++;
+                        }
+                    }
+                }
+            }
+
+            monFicLog.Log("Traitement côté base serveur pour récupérer la liste des factures dont le net à payer est égal à 0 mais dont le montant d'acompte est inférieur à la somme des encaissements versés.", ficLog);
+
+            // Initialisations des paramètres pour le passage de la requête
+            requetes = "SELECT f.id_facture, f.numdoc, f.titre, f.accompte AS Acompte_fact, f.uid FROM facture f WHERE netapayer = 0 AND f.accompte < (SELECT SUM(montant) FROM encaissement e WHERE e.doc_id = f.id_facture AND type_doc like 'F') ORDER BY f.numdoc";
+            paramConnexion = "Driver={PostgreSQL UNICODE};Server=" + textBoxAdrServeur.Text + ";Port=" + textBoxPortServeur.Text + ";Database=" + comboBoxBaseServeur.Text + ";Uid=" + loginPG + ";Pwd=" + passPG + ";";
+
+            using (chaineConnexionListeBases = new OdbcConnection(paramConnexion))
+            {
+                try
+                {
+                    // Passage de la commande
+                    mesRequetes = new OdbcCommand(requetes, chaineConnexionListeBases);
+                    // Ouverture
+                    chaineConnexionListeBases.Open();
+                }
+                catch (Exception ex)
+                {
+                    monFicLog.Log("Erreur de connexion ODBC à la récupération des factures côtés serveur.", ficLog);
+                    monFicLog.Log(ex.ToString(), ficLog);
+                    mesTests = false;
+                    MessageBox.Show("Erreur à la connexion à la base serveur.");
+                }
+                finally
+                {
+                    // Exécution si pas d'exception
+                    if (mesTests)
+                    {
+                        // Exécution de la requête
+                        retourRequetes = mesRequetes.ExecuteReader();
+
+                        // Tant qu'il y a des données retournées par la requête
+                        while (retourRequetes.Read())
+                        {
+                            tabFacturesServeur[i] = retourRequetes["f.uid"].ToString();
+                            monFicLog.Log("Facture n°" + retourRequetes["f.numdoc"].ToString() + " identifiée comme ayant un encaissement de trop.", ficLog);
+
+                            i++;
+                        }
+                    }
+                }
+            }
+
+            listFactures = tabFacturesClients.Intersect(tabFacturesServeur);
         }
     }
 }

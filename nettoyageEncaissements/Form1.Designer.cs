@@ -202,6 +202,7 @@
             this.buttonDemarrage.TabIndex = 4;
             this.buttonDemarrage.Text = "Lancer la vérification";
             this.buttonDemarrage.UseVisualStyleBackColor = true;
+            this.buttonDemarrage.Click += new System.EventHandler(this.buttonDemarrage_Click);
             // 
             // Form1
             // 
