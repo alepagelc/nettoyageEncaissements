@@ -24,15 +24,19 @@ namespace nettoyageEncaissements
         string portClient;
         string adrClient;
         private OdbcConnection chaineConnexionListeBases = new OdbcConnection();
+        private OdbcConnection chaineConnexionListeBases2 = new OdbcConnection();
         private OdbcCommand mesRequetes;
+        private OdbcCommand mesRequetes2;
         private OdbcDataReader retourRequetes;
+        private OdbcDataReader retourRequetes2;
         string maintenant = DateTime.Now.ToString("yyMMdd_HHmmss");
-        List<string> listFacturesClients = new List<string>();
-        List<string> listFacturesServeur = new List<string>();
-        string[] tabFacturesClients = new string[0];
-        string[] tabFacturesServeur = new string[0];
-        IEnumerable<string> listFactures = new List<string>();
+        List<Affaire> listAffairesClient = new List<Affaire>();
+        List<Affaire> listAffairesServeur = new List<Affaire>();
+        string[] tabAffairesClient = new string[0];
+        string[] tabAffairesServeur = new string[0];
+        IEnumerable<string> listAffaires = new List<string>();
         int i = 0;
+        string libelleTemp = "";
         
 
         public Form1()
@@ -422,7 +426,45 @@ namespace nettoyageEncaissements
             monFicLog.Log("Traitement côté base client pour récupérer la liste des factures dont le net à payer est inférieur à 0 mais dont le montant d'acompte est tout de même égal à la somme des encaissements versés.", ficLog);
 
             // Initialisations des paramètres pour le passage de la requête
-            requetes = "SELECT f.id_facture AS INDEX, f.numdoc AS NUMFAC, f.titre, f.accompte AS Acompte_fact, f.uid AS UID FROM facture f WHERE netapayer< 0 AND f.accompte = (SELECT SUM(montant) FROM encaissement e WHERE e.doc_id = f.id_facture AND type_doc like 'F') ORDER BY f.numdoc";
+            requetes = @"SELECT f.id_facture AS ID, 'F' AS TYPEDOC, f.numdoc AS NUMAFF, f.accompte AS ACOMPTE, f.uid AS UID
+                        FROM facture f
+                        WHERE f.netapayer < 0
+                        AND f.accompte = (SELECT SUM(montant) FROM encaissement e WHERE e.doc_id = f.id_facture AND type_doc like 'F')
+                        UNION
+                        SELECT fa.id_facture_arch AS ID, 'A' AS TYPEDOC, fa.numdoc AS NUMAFF, fa.accompte AS ACOMPTE, fa.uid AS UID
+                        FROM facture_arch fa
+                        WHERE fa.netapayer < 0
+                        AND fa.accompte = (SELECT SUM(montant) FROM encaissement e WHERE e.doc_id = fa.id_facture_arch AND type_doc like 'A')
+                        UNION
+                        SELECT b.id_bonliv AS ID, 'B' AS TYPEDOC, b.numdoc AS NUMAFF, b.accompte AS ACOMPTE, b.uid AS UID
+                        FROM bonliv b
+                        WHERE b.netapayer < 0
+                        AND b.accompte = (SELECT SUM(montant) FROM encaissement e WHERE e.doc_id = b.id_bonliv AND type_doc like 'B')
+                        UNION
+                        SELECT ba.id_bonliv_arch AS ID, 'L' AS TYPEDOC, ba.numdoc AS NUMAFF, ba.accompte AS ACOMPTE, ba.uid AS UID
+                        FROM bonliv_arch ba
+                        WHERE ba.netapayer < 0
+                        AND ba.accompte = (SELECT SUM(montant) FROM encaissement e WHERE e.doc_id = ba.id_bonliv_arch AND type_doc like 'L')
+                        UNION
+                        SELECT c.id_cde AS ID, 'C' AS TYPEDOC, c.numdoc AS NUMAFF, c.accompte AS ACOMPTE, c.uid AS UID
+                        FROM cde c
+                        WHERE c.netapayer < 0
+                        AND c.accompte = (SELECT SUM(montant) FROM encaissement e WHERE e.doc_id = c.id_cde AND type_doc like 'C')
+                        UNION
+                        SELECT ca.id_cde_arch AS ID, 'M' AS TYPEDOC, ca.numdoc AS NUMAFF, ca.accompte AS ACOMPTE, ca.uid AS UID
+                        FROM cde_arch ca
+                        WHERE ca.netapayer < 0
+                        AND ca.accompte = (SELECT SUM(montant) FROM encaissement e WHERE e.doc_id = ca.id_cde_arch AND type_doc like 'M')
+                        UNION
+                        SELECT d.id_devis AS ID, 'M' AS TYPEDOC, d.numdoc AS NUMAFF, d.accompte AS ACOMPTE, d.uid AS UID
+                        FROM devis d
+                        WHERE d.netapayer < 0
+                        AND d.accompte = (SELECT SUM(montant) FROM encaissement e WHERE e.doc_id = d.id_devis AND type_doc like 'D')
+                        UNION
+                        SELECT da.id_devis_arch AS ID, 'M' AS TYPEDOC, da.numdoc AS NUMAFF, da.accompte AS ACOMPTE, da.uid AS UID
+                        FROM devis_arch da
+                        WHERE da.netapayer < 0
+                        AND da.accompte = (SELECT SUM(montant) FROM encaissement e WHERE e.doc_id = da.id_devis_arch AND type_doc like 'W')";
             //requetes = "SELECT * FROM facture f WHERE netapayer< 0 AND f.accompte = (SELECT SUM(montant) FROM encaissement e WHERE e.doc_id = f.id_facture AND type_doc like 'F') ORDER BY f.numdoc";
 
             paramConnexion = "Driver={PostgreSQL UNICODE};Server=" + textBoxAdrClient.Text + ";Port=" + textBoxPortClient.Text + ";Database=" + comboBoxBaseClient.Text + ";Uid=" + loginPG + ";Pwd=" + passPG + ";";
@@ -438,7 +480,7 @@ namespace nettoyageEncaissements
                 }
                 catch (Exception ex)
                 {
-                    monFicLog.Log("Erreur de connexion ODBC à la récupération des factures côtés client.", ficLog);
+                    monFicLog.Log("Erreur de connexion ODBC à la récupération des affaires côté client.", ficLog);
                     monFicLog.Log(ex.ToString(), ficLog);
                     mesTests = false;
                     MessageBox.Show("Erreur à la connexion à la base client.");
@@ -456,14 +498,43 @@ namespace nettoyageEncaissements
                         // Tant qu'il y a des données retournées par la requête
                         while (retourRequetes.Read())
                         {
-                            Array.Resize(ref tabFacturesClients, tabFacturesClients.Length + 1);
-                            tabFacturesClients[i] = retourRequetes["UID"].ToString();
-                            //tabFacturesClients[i].identifiant = retourRequetes["INDEX"].ToString();
-                            //tabFacturesClients[i].numero = retourRequetes["NUMFAC"].ToString();
-                            //tabFacturesClients[i].uid = retourRequetes["UID"].ToString();
-                            
-                            //listFacturesClients.Add(retourRequetes["f.uid"].ToString());
-                            monFicLog.Log("Facture n°" + retourRequetes["NUMFAC"].ToString() + " identifiée comme ayant un encaissement de trop.", ficLog);
+                            // Objet
+                            listAffairesClient.Add(new Affaire(int.Parse(retourRequetes["ID"].ToString()), retourRequetes["TYPEDOC"].ToString(), double.Parse(retourRequetes["ACOMPTE"].ToString()), int.Parse(retourRequetes["UID"].ToString()), retourRequetes["NUMAFF"].ToString());
+
+                            // Procédure
+                            Array.Resize(ref tabAffairesClient, tabAffairesClient.Length + 1);
+                            tabAffairesClient[i] = retourRequetes["UID"].ToString();
+
+                            switch (retourRequetes["TYPEDOC"].ToString())
+                            {
+                                case "F":
+                                    libelleTemp = "Facture n° " + retourRequetes["NUMAFF"].ToString() + " identifiée";
+                                    break;
+                                case "A":
+                                    libelleTemp = "Facture archivée n° " + retourRequetes["NUMAFF"].ToString() + " identifiée";
+                                    break;
+                                case "B":
+                                    libelleTemp = "Bon de livraison n° " + retourRequetes["NUMAFF"].ToString() + " identifié";
+                                    break;
+                                case "L":
+                                    libelleTemp = "Bon de livraison archivé n° " + retourRequetes["NUMAFF"].ToString() + " identifié";
+                                    break;
+                                case "C":
+                                    libelleTemp = "Commande n° " + retourRequetes["NUMAFF"].ToString() + " identifiée";
+                                    break;
+                                case "M":
+                                    libelleTemp = "Commande archivée n° " + retourRequetes["NUMAFF"].ToString() + " identifiée";
+                                    break;
+                                case "D":
+                                    libelleTemp = "Devis n° " + retourRequetes["NUMAFF"].ToString() + " identifié";
+                                    break;
+                                case "W":
+                                    libelleTemp = "Devis archivé n° " + retourRequetes["NUMAFF"].ToString() + " identifié";
+                                    break;
+                                default:
+                                    break;
+                            }
+                            monFicLog.Log(libelleTemp + " comme ayant un encaissement de trop sur la base client.", ficLog);
 
                             i++;
                         }
@@ -473,11 +544,50 @@ namespace nettoyageEncaissements
                 }
             }
 
-            monFicLog.Log("Traitement côté base serveur pour récupérer la liste des factures dont le net à payer est égal à 0 mais dont le montant d'acompte est inférieur à la somme des encaissements versés.", ficLog);
+            monFicLog.Log("Traitement côté base serveur pour récupérer la liste des affaires dont le net à payer est égal à 0 mais dont le montant d'acompte est inférieur à la somme des encaissements versés.", ficLog);
 
             // Initialisations des paramètres pour le passage de la requête
-            // Le montant d'acompte des factures est augmenté de 1 centime, l'opérateur d'infériorité renvoyant des montants égaux entre l'acompte et la somme des encaisssements
-            requetes = "SELECT f.id_facture, f.numdoc AS NUMFAC, f.titre, f.accompte AS Acompte_fact, f.uid AS UID FROM facture f WHERE netapayer = 0 AND f.accompte + 0.01 < (SELECT SUM(montant) FROM encaissement e WHERE e.doc_id = f.id_facture AND type_doc like 'F') ORDER BY f.numdoc";
+            // Le montant d'acompte des affaires est augmenté de 0,01 centime, l'opérateur d'infériorité renvoyant des montants égaux entre l'acompte et la somme des encaisssements
+            requetes = @"SELECT f.id_facture AS ID, 'F' AS TYPEDOC, f.numdoc AS NUMAFF, f.accompte AS ACOMPTE, f.uid AS UID
+                        FROM facture f
+                        WHERE f.netapayer = 0
+                        AND f.accompte + 0.00001 < (SELECT SUM(montant) FROM encaissement e WHERE e.doc_id = f.id_facture AND type_doc like 'F')
+                        UNION
+                        SELECT fa.id_facture_arch AS ID, 'W' AS TYPEDOC, fa.numdoc AS NUMAFF, fa.accompte AS ACOMPTE, fa.uid AS UID
+                        FROM facture_arch fa
+                        WHERE fa.netapayer = 0
+                        AND fa.accompte + 0.00001 < (SELECT SUM(montant) FROM encaissement e WHERE e.doc_id = fa.id_facture_arch AND type_doc like 'W')
+                        UNION
+                        SELECT b.id_bonliv AS ID, 'B' AS TYPEDOC, b.numdoc AS NUMAFF, b.accompte AS ACOMPTE, b.uid AS UID
+                        FROM bonliv b
+                        WHERE b.netapayer = 0
+                        AND b.accompte + 0.00001 < (SELECT SUM(montant) FROM encaissement e WHERE e.doc_id = b.id_bonliv AND type_doc like 'B')
+                        UNION
+                        SELECT ba.id_bonliv_arch AS ID, 'L' AS TYPEDOC, ba.numdoc AS NUMAFF, ba.accompte AS ACOMPTE, ba.uid AS UID
+                        FROM bonliv_arch ba
+                        WHERE ba.netapayer = 0
+                        AND ba.accompte + 0.00001 < (SELECT SUM(montant) FROM encaissement e WHERE e.doc_id = ba.id_bonliv_arch AND type_doc like 'L')
+                        UNION
+                        SELECT c.id_cde AS ID, 'C' AS TYPEDOC, c.numdoc AS NUMAFF, c.accompte AS ACOMPTE, c.uid AS UID
+                        FROM cde c
+                        WHERE c.netapayer = 0
+                        AND c.accompte + 0.00001 < (SELECT SUM(montant) FROM encaissement e WHERE e.doc_id = c.id_cde AND type_doc like 'C')
+                        UNION
+                        SELECT ca.id_cde_arch AS ID, 'M' AS TYPEDOC, ca.numdoc AS NUMAFF, ca.accompte AS ACOMPTE, ca.uid AS UID
+                        FROM cde_arch ca
+                        WHERE ca.netapayer = 0
+                        AND ca.accompte + 0.00001 < (SELECT SUM(montant) FROM encaissement e WHERE e.doc_id = ca.id_cde_arch AND type_doc like 'M')
+                        UNION
+                        SELECT d.id_devis AS ID, 'D' AS TYPEDOC, d.numdoc AS NUMAFF, d.accompte AS ACOMPTE, d.uid AS UID
+                        FROM devis d
+                        WHERE d.netapayer = 0
+                        AND d.accompte + 0.00001 < (SELECT SUM(montant) FROM encaissement e WHERE e.doc_id = d.id_devis AND type_doc like 'D')
+                        UNION
+                        SELECT da.id_devis_arch AS ID, 'W' AS TYPEDOC, da.numdoc AS NUMAFF, da.accompte AS ACOMPTE, da.uid AS UID
+                        FROM devis_arch da
+                        WHERE da.netapayer = 0
+                        AND da.accompte + 0.00001 < (SELECT SUM(montant) FROM encaissement e WHERE e.doc_id = da.id_devis_arch AND type_doc like 'W')
+                        ";
             paramConnexion = "Driver={PostgreSQL UNICODE};Server=" + textBoxAdrServeur.Text + ";Port=" + textBoxPortServeur.Text + ";Database=" + comboBoxBaseServeur.Text + ";Uid=" + loginPG + ";Pwd=" + passPG + ";";
 
             using (chaineConnexionListeBases = new OdbcConnection(paramConnexion))
@@ -491,7 +601,7 @@ namespace nettoyageEncaissements
                 }
                 catch (Exception ex)
                 {
-                    monFicLog.Log("Erreur de connexion ODBC à la récupération des factures côtés serveur.", ficLog);
+                    monFicLog.Log("Erreur de connexion ODBC à la récupération des affaires côtés serveur.", ficLog);
                     monFicLog.Log(ex.ToString(), ficLog);
                     mesTests = false;
                     MessageBox.Show("Erreur à la connexion à la base serveur.");
@@ -509,13 +619,43 @@ namespace nettoyageEncaissements
                         // Tant qu'il y a des données retournées par la requête
                         while (retourRequetes.Read())
                         {
-                            Array.Resize(ref tabFacturesServeur, tabFacturesServeur.Length + 1);
-                            tabFacturesServeur[i] = retourRequetes["UID"].ToString();
-                            //tabFacturesServeur[i].identifiant = retourRequetes["INDEX"].ToString();
-                            //tabFacturesServeur[i].numero = retourRequetes["NUMFAC"].ToString();
-                            //tabFacturesServeur[i].uid = retourRequetes["UID"].ToString();
-                            
-                            monFicLog.Log("Facture n°" + retourRequetes["NUMFAC"].ToString() + " identifiée comme ayant un encaissement de trop.", ficLog);
+                            // Objet
+                            listAffairesServeur.Add(new Affaire(int.Parse(retourRequetes["ID"].ToString()), retourRequetes["TYPEDOC"].ToString(), double.Parse(retourRequetes["ACOMPTE"].ToString()), int.Parse(retourRequetes["UID"].ToString()), retourRequetes["NUMAFF"].ToString());
+
+                            // Procédure
+                            Array.Resize(ref tabAffairesServeur, tabAffairesServeur.Length + 1);
+                            tabAffairesServeur[i] = retourRequetes["UID"].ToString();
+
+                            switch (retourRequetes["TYPEDOC"].ToString())
+                            {
+                                case "F":
+                                    libelleTemp = "Facture n° " + retourRequetes["NUMAFF"].ToString() + " identifiée";
+                                    break;
+                                case "A":
+                                    libelleTemp = "Facture archivée n° " + retourRequetes["NUMAFF"].ToString() + " identifiée";
+                                    break;
+                                case "B":
+                                    libelleTemp = "Bon de livraison n° " + retourRequetes["NUMAFF"].ToString() + " identifié";
+                                    break;
+                                case "L":
+                                    libelleTemp = "Bon de livraison archivé n° " + retourRequetes["NUMAFF"].ToString() + " identifié";
+                                    break;
+                                case "C":
+                                    libelleTemp = "Commande n° " + retourRequetes["NUMAFF"].ToString() + " identifiée";
+                                    break;
+                                case "M":
+                                    libelleTemp = "Commande archivée n° " + retourRequetes["NUMAFF"].ToString() + " identifiée";
+                                    break;
+                                case "D":
+                                    libelleTemp = "Devis n° " + retourRequetes["NUMAFF"].ToString() + " identifié";
+                                    break;
+                                case "W":
+                                    libelleTemp = "Devis archivé n° " + retourRequetes["NUMAFF"].ToString() + " identifié";
+                                    break;
+                                default:
+                                    break;
+                            }
+                            monFicLog.Log(libelleTemp + " comme ayant un encaissement de trop sur la base serveur.", ficLog);
 
                             i++;
                         }
@@ -525,37 +665,129 @@ namespace nettoyageEncaissements
                 }
             }
 
-            listFactures = tabFacturesClients.Intersect(tabFacturesServeur);
+            listAffaires = tabAffairesClient.Intersect(tabAffairesServeur);
 
-            foreach (string uid in listFactures)
+            i = 0;
+            string requeteIdentFacture = "SELECT id_facture FROM facture WHERE uid = ";
+
+
+            foreach (string uid in listAffaires)
             {
-                string requeteIdentFacture = "SELECT id_facture FROM facture WHERE uid = " + uid;
-                paramConnexion = "Driver={PostgreSQL UNICODE};Server=" + textBoxAdrServeur.Text + ";Port=" + textBoxPortServeur.Text + ";Database=" + comboBoxBaseServeur.Text + ";Uid=" + loginPG + ";Pwd=" + passPG + ";";
-
-                using (chaineConnexionListeBases = new OdbcConnection(paramConnexion))
+                if (i == 0)
                 {
-                    try
-                    {
-                        // Passage de la commande
-                        mesRequetes = new OdbcCommand(requeteIdentFacture, chaineConnexionListeBases);
-                        // Ouverture
-                        chaineConnexionListeBases.Open();
-                    }
-                    catch (Exception ex)
-                    {
-                        monFicLog.Log("Erreur de connexion ODBC à la récupération de la liste des factures côtés serveur.", ficLog);
-                        monFicLog.Log(ex.ToString(), ficLog);
-                        mesTests = false;
-                        MessageBox.Show("Erreur à la connexion à la base serveur.");
-                    }
-                    finally
-                    {
-                        // Exécution si pas d'exception
-                        if (mesTests)
-                        {
+                    requeteIdentFacture = requeteIdentFacture + uid;
+                    i++;
+                }
+                else
+                {
+                    requeteIdentFacture = requeteIdentFacture + "OR uid = " + uid;
+                    i++;
+                }
+            }
 
+            paramConnexion = "Driver={PostgreSQL UNICODE};Server=" + textBoxAdrServeur.Text + ";Port=" + textBoxPortServeur.Text + ";Database=" + comboBoxBaseServeur.Text + ";Uid=" + loginPG + ";Pwd=" + passPG + ";";
+
+            using (chaineConnexionListeBases = new OdbcConnection(paramConnexion))
+            {
+                try
+                {
+                    // Passage de la commande
+                    mesRequetes = new OdbcCommand(requeteIdentFacture, chaineConnexionListeBases);
+                    // Ouverture
+                    chaineConnexionListeBases.Open();
+                }
+                catch (Exception ex)
+                {
+                    monFicLog.Log("Erreur de connexion ODBC à la récupération de la liste des factures côtés serveur.", ficLog);
+                    monFicLog.Log(ex.ToString(), ficLog);
+                    mesTests = false;
+                    MessageBox.Show("Erreur à la connexion à la base serveur lors de la récupération de la liste des factures comportant des erreurs.");
+                }
+                finally
+                {
+                    // Exécution si pas d'exception
+                    if (mesTests)
+                    {
+                        retourRequetes = mesRequetes.ExecuteReader();
+
+                        // Tant qu'il y a des données retournées par la requête
+                        while (retourRequetes.Read())
+                        {
+                            string requeteEncaissement = "SELECT  e1.id_encaissement AS ID, e1.montant, e1.dtencaissement, (SELECT COUNT(*) FROM encaissement e2 WHERE e2.doc_id = e1.doc_id AND e2.montant::text||'-'||e2.dtencaissement::text = e1.montant::text||'-'||e1.dtencaissement::text) AS NB_DOUBLON FROM encaissement e1 WHERE e1.doc_id = " + retourRequetes["id_facture"].ToString() + " AND e1.type_doc = 'F' ORDER BY NB_DOUBLON DESC, ddc DESC LIMIT 1";
+
+                            using (chaineConnexionListeBases2 = new OdbcConnection(paramConnexion))
+                            {
+                                try
+                                {
+                                    // Passage de la commande
+                                    mesRequetes2 = new OdbcCommand(requeteEncaissement, chaineConnexionListeBases2);
+                                    // Ouverture
+                                    chaineConnexionListeBases2.Open();
+                                }
+                                catch (Exception ex)
+                                {
+                                    monFicLog.Log("Erreur de connexion ODBC à la récupération de la liste des encaissements côté serveur.", ficLog);
+                                    monFicLog.Log(ex.ToString(), ficLog);
+                                    mesTests = false;
+                                    MessageBox.Show("Erreur à la connexion à la base serveur pour la recherche des encaissements.");
+                                }
+                                finally
+                                {
+                                    string requeteSuppressionEncaissement = "";
+                                    string idEncaissement = "";
+
+                                    if (mesTests)
+                                    {
+                                        while (retourRequetes2.Read())
+                                        {
+                                            requeteSuppressionEncaissement = "DELETE FROM encaissement WHERE id_encaissement = " + retourRequetes2["ID"].ToString();
+                                            idEncaissement = retourRequetes2["ID"].ToString();
+                                        }                                   
+                                    }
+
+                                    retourRequetes2.Close();
+
+                                    using (chaineConnexionListeBases2 = new OdbcConnection(paramConnexion))
+                                    {
+                                        try
+                                        {
+                                            // Passage de la commande
+                                            mesRequetes2 = new OdbcCommand(requeteSuppressionEncaissement, chaineConnexionListeBases2);
+                                            // Ouverture
+                                            chaineConnexionListeBases2.Open();
+                                        }
+                                        catch (Exception ex)
+                                        {
+                                            monFicLog.Log("Erreur de connexion ODBC à la récupération de la liste des encaissements côté serveur.", ficLog);
+                                            monFicLog.Log(ex.ToString(), ficLog);
+                                            mesTests = false;
+                                            MessageBox.Show("Erreur à la connexion à la base serveur pour la recherche des encaissements.");
+                                        }
+                                        finally
+                                        {
+                                            if (mesTests)
+                                            {
+                                                try
+                                                {
+                                                    mesRequetes2.ExecuteNonQuery();
+                                                    monFicLog.Log("Suppression de l'encaissement d'id " + idEncaissement + "dans la base serveur " + comboBoxBaseServeur.Text, ficLog);
+                                                }
+                                                catch (Exception ex)
+                                                {
+                                                    monFicLog.Log("Erreur de connexion ODBC lors de la tentative de suppression de l'encaissement identifié " + idEncaissement + " sur la base serveur " + comboBoxBaseServeur.Text, ficLog);
+                                                    monFicLog.Log(ex.ToString(), ficLog);
+                                                    mesTests = false;
+                                                    MessageBox.Show("Erreur à la suppression d'un encaissement sur la base serveur.");
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
+
+                    retourRequetes.Close();
                 }
             }
         }
