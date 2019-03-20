@@ -665,6 +665,16 @@ namespace nettoyageEncaissements
                 }
             }
 
+            // Objet
+            foreach (Affaire zAffaire in listAffairesServeur)
+            {
+                if (listAffairesClient.Exists(x => x.uid == zAffaire.uid))
+                {
+                    // Alimenter la liste des affaires communes sur le serveur et en local
+                }
+            }
+
+            // Procédure
             listAffaires = tabAffairesClient.Intersect(tabAffairesServeur);
 
             i = 0;
