@@ -35,6 +35,7 @@ namespace nettoyageEncaissements
         string[] tabAffairesClient = new string[0];
         string[] tabAffairesServeur = new string[0];
         IEnumerable<string> listAffaires = new List<string>();
+        IEnumerable<Affaire> listAffairesO = new List<Affaire>();
         int i = 0;
         string libelleTemp = "";
         
@@ -499,11 +500,11 @@ namespace nettoyageEncaissements
                         while (retourRequetes.Read())
                         {
                             // Objet
-                            listAffairesClient.Add(new Affaire(int.Parse(retourRequetes["ID"].ToString()), retourRequetes["TYPEDOC"].ToString(), double.Parse(retourRequetes["ACOMPTE"].ToString()), int.Parse(retourRequetes["UID"].ToString()), retourRequetes["NUMAFF"].ToString());
+                            listAffairesClient.Add(new Affaire(int.Parse(retourRequetes["ID"].ToString()), retourRequetes["TYPEDOC"].ToString(), double.Parse(retourRequetes["ACOMPTE"].ToString()), retourRequetes["UID"].ToString(), retourRequetes["NUMAFF"].ToString()));
 
                             // Procédure
-                            Array.Resize(ref tabAffairesClient, tabAffairesClient.Length + 1);
-                            tabAffairesClient[i] = retourRequetes["UID"].ToString();
+                            //Array.Resize(ref tabAffairesClient, tabAffairesClient.Length + 1);
+                            //tabAffairesClient[i] = retourRequetes["UID"].ToString();
 
                             switch (retourRequetes["TYPEDOC"].ToString())
                             {
@@ -620,11 +621,11 @@ namespace nettoyageEncaissements
                         while (retourRequetes.Read())
                         {
                             // Objet
-                            listAffairesServeur.Add(new Affaire(int.Parse(retourRequetes["ID"].ToString()), retourRequetes["TYPEDOC"].ToString(), double.Parse(retourRequetes["ACOMPTE"].ToString()), int.Parse(retourRequetes["UID"].ToString()), retourRequetes["NUMAFF"].ToString());
+                            listAffairesServeur.Add(new Affaire(int.Parse(retourRequetes["ID"].ToString()), retourRequetes["TYPEDOC"].ToString(), double.Parse(retourRequetes["ACOMPTE"].ToString()), retourRequetes["UID"].ToString(), retourRequetes["NUMAFF"].ToString()));
 
                             // Procédure
-                            Array.Resize(ref tabAffairesServeur, tabAffairesServeur.Length + 1);
-                            tabAffairesServeur[i] = retourRequetes["UID"].ToString();
+                            //Array.Resize(ref tabAffairesServeur, tabAffairesServeur.Length + 1);
+                            //tabAffairesServeur[i] = retourRequetes["UID"].ToString();
 
                             switch (retourRequetes["TYPEDOC"].ToString())
                             {
@@ -666,31 +667,25 @@ namespace nettoyageEncaissements
             }
 
             // Objet
-            foreach (Affaire zAffaire in listAffairesServeur)
-            {
-                if (listAffairesClient.Exists(x => x.uid == zAffaire.uid))
-                {
-                    // Alimenter la liste des affaires communes sur le serveur et en local
-                }
-            }
+            listAffairesO = listAffairesServeur.Intersect(listAffairesClient, new AffaireComparer());
 
             // Procédure
-            listAffaires = tabAffairesClient.Intersect(tabAffairesServeur);
+            //listAffaires = tabAffairesClient.Intersect(tabAffairesServeur);
 
             i = 0;
             string requeteIdentFacture = "SELECT id_facture FROM facture WHERE uid = ";
 
 
-            foreach (string uid in listAffaires)
+            foreach (Affaire affaire in listAffairesO)
             {
                 if (i == 0)
                 {
-                    requeteIdentFacture = requeteIdentFacture + uid;
+                    requeteIdentFacture = requeteIdentFacture + affaire.uid;
                     i++;
                 }
                 else
                 {
-                    requeteIdentFacture = requeteIdentFacture + "OR uid = " + uid;
+                    requeteIdentFacture = requeteIdentFacture + "OR uid = " + affaire.uid;
                     i++;
                 }
             }
@@ -723,7 +718,12 @@ namespace nettoyageEncaissements
                         // Tant qu'il y a des données retournées par la requête
                         while (retourRequetes.Read())
                         {
-                            string requeteEncaissement = "SELECT  e1.id_encaissement AS ID, e1.montant, e1.dtencaissement, (SELECT COUNT(*) FROM encaissement e2 WHERE e2.doc_id = e1.doc_id AND e2.montant::text||'-'||e2.dtencaissement::text = e1.montant::text||'-'||e1.dtencaissement::text) AS NB_DOUBLON FROM encaissement e1 WHERE e1.doc_id = " + retourRequetes["id_facture"].ToString() + " AND e1.type_doc = 'F' ORDER BY NB_DOUBLON DESC, ddc DESC LIMIT 1";
+                            string requeteEncaissement = @"SELECT  e1.id_encaissement AS ID, e1.montant, e1.dtencaissement, (SELECT COUNT(*)
+                                                                                                                            FROM encaissement e2
+                                                                                                                            WHERE e2.doc_id = e1.doc_id
+                                                                                                                            AND e2.montant::text||'-'||e2.dtencaissement::text = e1.montant::text||'-'||e1.dtencaissement::text) AS NB_DOUBLON
+                                                            FROM encaissement e1
+                                                            WHERE e1.doc_id = " + retourRequetes["id_facture"].ToString() + "AND e1.type_doc = 'F' ORDER BY NB_DOUBLON DESC, ddc DESC LIMIT 1";
 
                             using (chaineConnexionListeBases2 = new OdbcConnection(paramConnexion))
                             {

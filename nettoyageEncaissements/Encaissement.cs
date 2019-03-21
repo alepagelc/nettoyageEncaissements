@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace nettoyageEncaissements
 {
-    class Encaissement
+    public class Encaissement
     {
         public int id { get; set; }
         public int montant { get; set; }
