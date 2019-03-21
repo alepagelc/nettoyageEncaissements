@@ -34,6 +34,7 @@ namespace nettoyageEncaissements
         List<Affaire> listAffairesServeur = new List<Affaire>();
         string[] tabAffairesClient = new string[0];
         string[] tabAffairesServeur = new string[0];
+        List<string> listUidEncaissements = new List<string>();
         IEnumerable<string> listAffaires = new List<string>();
         IEnumerable<Affaire> listAffairesO = new List<Affaire>();
         int i = 0;
@@ -666,129 +667,199 @@ namespace nettoyageEncaissements
                 }
             }
 
-            // Objet
+            // Intersection des deux listes d'affaires
             listAffairesO = listAffairesServeur.Intersect(listAffairesClient, new AffaireComparer());
-
-            // Procédure
-            //listAffaires = tabAffairesClient.Intersect(tabAffairesServeur);
-
-            i = 0;
-            string requeteIdentFacture = "SELECT id_facture FROM facture WHERE uid = ";
-
-
-            foreach (Affaire affaire in listAffairesO)
-            {
-                if (i == 0)
-                {
-                    requeteIdentFacture = requeteIdentFacture + affaire.uid;
-                    i++;
-                }
-                else
-                {
-                    requeteIdentFacture = requeteIdentFacture + "OR uid = " + affaire.uid;
-                    i++;
-                }
-            }
 
             paramConnexion = "Driver={PostgreSQL UNICODE};Server=" + textBoxAdrServeur.Text + ";Port=" + textBoxPortServeur.Text + ";Database=" + comboBoxBaseServeur.Text + ";Uid=" + loginPG + ";Pwd=" + passPG + ";";
 
-            using (chaineConnexionListeBases = new OdbcConnection(paramConnexion))
+            foreach (Affaire affaire in listAffairesO)
             {
-                try
+                requetes = @"SELECT  e1.id_encaissement AS ID, e1.uid AS UID, e1.montant, e1.dtencaissement, (SELECT COUNT(*)
+                                                                                                FROM encaissement e2
+                                                                                                WHERE e2.doc_id = e1.doc_id
+                                                                                                AND e2.montant::text||'-'||e2.dtencaissement::text = e1.montant::text||'-'||e1.dtencaissement::text) AS NB_DOUBLON
+                                FROM encaissement e1
+                                WHERE e1.doc_id = " + affaire.numaff + "AND e1.type_doc = '" + affaire.type + "' ORDER BY NB_DOUBLON DESC, ddc DESC LIMIT 1";
+
+                using (chaineConnexionListeBases = new OdbcConnection(paramConnexion))
                 {
-                    // Passage de la commande
-                    mesRequetes = new OdbcCommand(requeteIdentFacture, chaineConnexionListeBases);
-                    // Ouverture
-                    chaineConnexionListeBases.Open();
-                }
-                catch (Exception ex)
-                {
-                    monFicLog.Log("Erreur de connexion ODBC à la récupération de la liste des factures côtés serveur.", ficLog);
-                    monFicLog.Log(ex.ToString(), ficLog);
-                    mesTests = false;
-                    MessageBox.Show("Erreur à la connexion à la base serveur lors de la récupération de la liste des factures comportant des erreurs.");
-                }
-                finally
-                {
-                    // Exécution si pas d'exception
-                    if (mesTests)
+                    try
                     {
-                        retourRequetes = mesRequetes.ExecuteReader();
-
-                        // Tant qu'il y a des données retournées par la requête
-                        while (retourRequetes.Read())
+                        // Passage de la commande
+                        mesRequetes = new OdbcCommand(requetes, chaineConnexionListeBases);
+                        // Ouverture
+                        chaineConnexionListeBases.Open();
+                    }
+                    catch (Exception ex)
+                    {
+                        monFicLog.Log("Erreur de connexion ODBC à la récupération de la liste des factures côtés serveur.", ficLog);
+                        monFicLog.Log(ex.ToString(), ficLog);
+                        mesTests = false;
+                        MessageBox.Show("Erreur à la connexion à la base serveur lors de la récupération de la liste des factures comportant des erreurs.");
+                    }
+                    finally
+                    {
+                        // Exécution si pas d'exception
+                        if (mesTests)
                         {
-                            string requeteEncaissement = @"SELECT  e1.id_encaissement AS ID, e1.montant, e1.dtencaissement, (SELECT COUNT(*)
-                                                                                                                            FROM encaissement e2
-                                                                                                                            WHERE e2.doc_id = e1.doc_id
-                                                                                                                            AND e2.montant::text||'-'||e2.dtencaissement::text = e1.montant::text||'-'||e1.dtencaissement::text) AS NB_DOUBLON
-                                                            FROM encaissement e1
-                                                            WHERE e1.doc_id = " + retourRequetes["id_facture"].ToString() + "AND e1.type_doc = 'F' ORDER BY NB_DOUBLON DESC, ddc DESC LIMIT 1";
+                            string requeteSuppressionEncaissement = "";
+                            string requeteSuppressionEncaissementRecordLog = "";
+                            string idEncaissement = "";
 
-                            using (chaineConnexionListeBases2 = new OdbcConnection(paramConnexion))
+                            while (retourRequetes.Read())
+                            {
+                                requeteSuppressionEncaissement = "DELETE FROM encaissement WHERE id_encaissement = " + retourRequetes["ID"].ToString();
+                                requeteSuppressionEncaissementRecordLog = "DELETE FROM record_log WHERE record_id = " + retourRequetes["ID"].ToString();
+                                idEncaissement = retourRequetes["ID"].ToString();
+                                listUidEncaissements.Add(retourRequetes["UID"].ToString());
+                            }
+
+                            retourRequetes.Close();
+
+                            using (chaineConnexionListeBases = new OdbcConnection(paramConnexion))
                             {
                                 try
                                 {
                                     // Passage de la commande
-                                    mesRequetes2 = new OdbcCommand(requeteEncaissement, chaineConnexionListeBases2);
+                                    mesRequetes = new OdbcCommand(requeteSuppressionEncaissement, chaineConnexionListeBases);
                                     // Ouverture
-                                    chaineConnexionListeBases2.Open();
+                                    chaineConnexionListeBases.Open();
                                 }
                                 catch (Exception ex)
                                 {
-                                    monFicLog.Log("Erreur de connexion ODBC à la récupération de la liste des encaissements côté serveur.", ficLog);
+                                    monFicLog.Log("Erreur de connexion ODBC pour la suppression des encaissements côté serveur.", ficLog);
                                     monFicLog.Log(ex.ToString(), ficLog);
                                     mesTests = false;
-                                    MessageBox.Show("Erreur à la connexion à la base serveur pour la recherche des encaissements.");
+                                    MessageBox.Show("Erreur à la connexion à la base serveur pour la suppression des encaissements.");
                                 }
                                 finally
                                 {
-                                    string requeteSuppressionEncaissement = "";
-                                    string idEncaissement = "";
-
                                     if (mesTests)
-                                    {
-                                        while (retourRequetes2.Read())
-                                        {
-                                            requeteSuppressionEncaissement = "DELETE FROM encaissement WHERE id_encaissement = " + retourRequetes2["ID"].ToString();
-                                            idEncaissement = retourRequetes2["ID"].ToString();
-                                        }                                   
-                                    }
-
-                                    retourRequetes2.Close();
-
-                                    using (chaineConnexionListeBases2 = new OdbcConnection(paramConnexion))
                                     {
                                         try
                                         {
-                                            // Passage de la commande
-                                            mesRequetes2 = new OdbcCommand(requeteSuppressionEncaissement, chaineConnexionListeBases2);
-                                            // Ouverture
-                                            chaineConnexionListeBases2.Open();
+                                            i = mesRequetes.ExecuteNonQuery();
                                         }
                                         catch (Exception ex)
                                         {
-                                            monFicLog.Log("Erreur de connexion ODBC à la récupération de la liste des encaissements côté serveur.", ficLog);
+                                            monFicLog.Log("Erreur de connexion ODBC lors de la tentative de suppression de l'encaissement identifié " + idEncaissement + " sur la base serveur " + comboBoxBaseServeur.Text, ficLog);
                                             monFicLog.Log(ex.ToString(), ficLog);
                                             mesTests = false;
-                                            MessageBox.Show("Erreur à la connexion à la base serveur pour la recherche des encaissements.");
+                                            MessageBox.Show("Erreur à la suppression d'un encaissement sur la base serveur.");
                                         }
                                         finally
                                         {
-                                            if (mesTests)
+                                            string typeAff = "";
+                                            switch (affaire.type)
                                             {
-                                                try
-                                                {
-                                                    mesRequetes2.ExecuteNonQuery();
-                                                    monFicLog.Log("Suppression de l'encaissement d'id " + idEncaissement + "dans la base serveur " + comboBoxBaseServeur.Text, ficLog);
-                                                }
-                                                catch (Exception ex)
-                                                {
-                                                    monFicLog.Log("Erreur de connexion ODBC lors de la tentative de suppression de l'encaissement identifié " + idEncaissement + " sur la base serveur " + comboBoxBaseServeur.Text, ficLog);
-                                                    monFicLog.Log(ex.ToString(), ficLog);
-                                                    mesTests = false;
-                                                    MessageBox.Show("Erreur à la suppression d'un encaissement sur la base serveur.");
-                                                }
+                                                case "D":
+                                                    typeAff = "devis";
+                                                    break;
+                                                case "W":
+                                                    typeAff = "devis archivé";
+                                                    break;
+                                                case "C":
+                                                    typeAff = "commande";
+                                                    break;
+                                                case "M":
+                                                    typeAff = "commande archivée";
+                                                    break;
+                                                case "B:
+                                                    typeAff = "bon de livraison";
+                                                    break;
+                                                case "L":
+                                                    typeAff = "bon de livraison archivé";
+                                                    break;
+                                                case "F":
+                                                    typeAff = "facture";
+                                                    break;
+                                                case "A":
+                                                    typeAff = "facture archivée";
+                                                    break;
+                                                default:
+                                                    break;
+                                            }
+
+                                            if (i == -1)
+                                            {
+                                                monFicLog.Log("Aucun encaissement à supprimer sur la base serveur " + comboBoxBaseServeur.Text + " pour l'affaire " + affaire.numaff + " de type " + typeAff, ficLog);
+                                            }
+                                            else
+                                            {
+                                                monFicLog.Log("Suppression de l'encaissement d'id " + idEncaissement + "dans la base serveur " + comboBoxBaseServeur.Text + " pour l'affaire " + affaire.numaff + " de type " + typeAff, ficLog);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            using (chaineConnexionListeBases = new OdbcConnection(paramConnexion))
+                            {
+                                try
+                                {
+                                    // Passage de la commande
+                                    mesRequetes = new OdbcCommand(requeteSuppressionEncaissementRecordLog, chaineConnexionListeBases);
+                                    // Ouverture
+                                    chaineConnexionListeBases.Open();
+                                }
+                                catch (Exception ex)
+                                {
+                                    monFicLog.Log("Erreur de connexion ODBC pour la seconde phase de suppression des encaissements côté serveur.", ficLog);
+                                    monFicLog.Log(ex.ToString(), ficLog);
+                                    mesTests = false;
+                                    MessageBox.Show("Erreur à la connexion à la base serveur lors de la seconde phase de suppression des encaissements.");
+                                }
+                                finally
+                                {
+                                    if (mesTests)
+                                    {
+                                        try
+                                        {
+                                            i = mesRequetes.ExecuteNonQuery();
+                                        }
+                                        catch (Exception ex)
+                                        {
+                                            monFicLog.Log("Erreur de connexion ODBC lors de la tentative de suppression de l'encaissement identifié " + idEncaissement + " sur la base serveur " + comboBoxBaseServeur.Text, ficLog);
+                                            monFicLog.Log(ex.ToString(), ficLog);
+                                            mesTests = false;
+                                            MessageBox.Show("Erreur à la suppression d'un encaissement sur la base serveur.");
+                                        }
+                                        finally
+                                        {
+                                            string typeAff = "";
+                                            switch (affaire.type)
+                                            {
+                                                case "D":
+                                                    typeAff = "devis";
+                                                    break;
+                                                case "W":
+                                                    typeAff = "devis archivé";
+                                                    break;
+                                                case "C":
+                                                    typeAff = "commande";
+                                                    break;
+                                                case "M":
+                                                    typeAff = "commande archivée";
+                                                    break;
+                                                case "B":
+                                                    typeAff = "bon de livraison";
+                                                    break;
+                                                case "L":
+                                                    typeAff = "bon de livraison archivé";
+                                                    break;
+                                                case "F":
+                                                    typeAff = "facture";
+                                                    break;
+                                                case "A":
+                                                    typeAff = "facture archivée";
+                                                    break;
+                                                default:
+                                                    break;
+                                            }
+
+                                            if (i == -1)
+                                            {
+                                                monFicLog.Log("Aucun encaissement à supprimer en seconde phase sur la base serveur " + comboBoxBaseServeur.Text + " pour l'affaire " + affaire.numaff + " de type " + typeAff, ficLog);
                                             }
                                         }
                                     }
@@ -796,8 +867,148 @@ namespace nettoyageEncaissements
                             }
                         }
                     }
+                }
+            }
 
-                    retourRequetes.Close();
+            paramConnexion = "Driver={PostgreSQL UNICODE};Server=" + textBoxAdrClient.Text + ";Port=" + textBoxPortClient.Text + ";Database=" + comboBoxBaseClient.Text + ";Uid=" + loginPG + ";Pwd=" + passPG + ";";
+
+            requetes = "SELECT id_encaissement AS ID FROM encaissement WHERE";
+            i = 0;
+            foreach (string uidEnc in listUidEncaissements)
+            {
+                if (i == 0)
+                {
+                    requetes = requetes + " uid like " + uidEnc;
+                    i++;
+                }
+                else
+                {
+                    requetes = requetes + " OR uid like " + uidEnc;
+                }
+            }
+
+            using (chaineConnexionListeBases = new OdbcConnection(paramConnexion))
+            {
+                try
+                {
+                    // Passage de la commande
+                    mesRequetes = new OdbcCommand(requetes, chaineConnexionListeBases);
+                    // Ouverture
+                    chaineConnexionListeBases.Open();
+                }
+                catch (Exception ex)
+                {
+                    monFicLog.Log("Erreur de connexion ODBC à la récupération de la liste des encaissements côté client.", ficLog);
+                    monFicLog.Log(ex.ToString(), ficLog);
+                    mesTests = false;
+                    MessageBox.Show("Erreur à la connexion à la base serveur lors de la récupération de la liste des encaissements côté base client.");
+                }
+                finally
+                {
+                    // Exécution si pas d'exception
+                    if (mesTests)
+                    {
+                        string requeteSuppressionEncaissement = "";
+                        string requeteSuppressionEncaissementRecordLog = "";
+                        string idEncaissement = "";
+
+                        while (retourRequetes.Read())
+                        {
+                            requeteSuppressionEncaissement = "DELETE FROM encaissement WHERE id_encaissement = " + retourRequetes["ID"].ToString();
+                            requeteSuppressionEncaissementRecordLog = "DELETE FROM record_log WHERE record_id = " + retourRequetes["ID"].ToString();
+                            idEncaissement = retourRequetes["ID"].ToString();
+                        }
+
+                        retourRequetes.Close();
+
+                        using (chaineConnexionListeBases = new OdbcConnection(paramConnexion))
+                        {
+                            try
+                            {
+                                // Passage de la commande
+                                mesRequetes = new OdbcCommand(requeteSuppressionEncaissement, chaineConnexionListeBases);
+                                // Ouverture
+                                chaineConnexionListeBases.Open();
+                            }
+                            catch (Exception ex)
+                            {
+                                monFicLog.Log("Erreur de connexion ODBC pour la suppression des encaissements côté serveur.", ficLog);
+                                monFicLog.Log(ex.ToString(), ficLog);
+                                mesTests = false;
+                                MessageBox.Show("Erreur à la connexion à la base serveur pour la suppression des encaissements.");
+                            }
+                            finally
+                            {
+                                if (mesTests)
+                                {
+                                    try
+                                    {
+                                        i = mesRequetes.ExecuteNonQuery();
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        monFicLog.Log("Erreur de connexion ODBC lors de la tentative de suppression de l'encaissement identifié " + idEncaissement + " sur la base client " + comboBoxBaseServeur.Text, ficLog);
+                                        monFicLog.Log(ex.ToString(), ficLog);
+                                        mesTests = false;
+                                        MessageBox.Show("Erreur à la suppression d'un encaissement sur la base client.");
+                                    }
+                                    finally
+                                    {
+                                        if (i == -1)
+                                        {
+                                            monFicLog.Log("Aucun encaissement à supprimer sur la base serveur " + comboBoxBaseServeur.Text + " pour l'affaire " + affaire.numaff + " de type " + typeAff, ficLog);
+                                        }
+                                        else
+                                        {
+                                            monFicLog.Log("Suppression de l'encaissement d'id " + idEncaissement + "dans la base serveur " + comboBoxBaseServeur.Text + " pour l'affaire " + affaire.numaff + " de type " + typeAff, ficLog);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        using (chaineConnexionListeBases = new OdbcConnection(paramConnexion))
+                        {
+                            try
+                            {
+                                // Passage de la commande
+                                mesRequetes = new OdbcCommand(requeteSuppressionEncaissementRecordLog, chaineConnexionListeBases);
+                                // Ouverture
+                                chaineConnexionListeBases.Open();
+                            }
+                            catch (Exception ex)
+                            {
+                                monFicLog.Log("Erreur de connexion ODBC pour la seconde phase de suppression des encaissements côté serveur.", ficLog);
+                                monFicLog.Log(ex.ToString(), ficLog);
+                                mesTests = false;
+                                MessageBox.Show("Erreur à la connexion à la base serveur lors de la seconde phase de suppression des encaissements.");
+                            }
+                            finally
+                            {
+                                if (mesTests)
+                                {
+                                    try
+                                    {
+                                        i = mesRequetes.ExecuteNonQuery();
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        monFicLog.Log("Erreur de connexion ODBC lors de la tentative de suppression de l'encaissement identifié " + idEncaissement + " sur la base serveur " + comboBoxBaseServeur.Text, ficLog);
+                                        monFicLog.Log(ex.ToString(), ficLog);
+                                        mesTests = false;
+                                        MessageBox.Show("Erreur à la suppression d'un encaissement sur la base serveur.");
+                                    }
+                                    finally
+                                    {
+                                        if (i == -1)
+                                        {
+                                            monFicLog.Log("Aucun encaissement à supprimer en seconde phase sur la base serveur " + comboBoxBaseServeur.Text, ficLog);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
