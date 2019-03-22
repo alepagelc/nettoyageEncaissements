@@ -13,7 +13,6 @@ namespace nettoyageEncaissements
         public double acompte { get; set; }
         public string uid { get; set; }
         public string numaff { get; set; }
-        public Encaissement[] encaissements { get; set; }
 
         public Affaire(int idaff, string typeaff, double acompteaff, string uidaff, string numaffaire)
         {

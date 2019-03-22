@@ -45,6 +45,7 @@
             this.label7 = new System.Windows.Forms.Label();
             this.comboBoxBaseClient = new System.Windows.Forms.ComboBox();
             this.buttonDemarrage = new System.Windows.Forms.Button();
+            this.chkBxBase = new System.Windows.Forms.CheckBox();
             ((System.ComponentModel.ISupportInitialize)(this.pictureBox2)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.pictureBox1)).BeginInit();
             this.SuspendLayout();
@@ -196,7 +197,7 @@
             // 
             // buttonDemarrage
             // 
-            this.buttonDemarrage.Location = new System.Drawing.Point(210, 312);
+            this.buttonDemarrage.Location = new System.Drawing.Point(210, 333);
             this.buttonDemarrage.Name = "buttonDemarrage";
             this.buttonDemarrage.Size = new System.Drawing.Size(169, 23);
             this.buttonDemarrage.TabIndex = 4;
@@ -204,11 +205,23 @@
             this.buttonDemarrage.UseVisualStyleBackColor = true;
             this.buttonDemarrage.Click += new System.EventHandler(this.buttonDemarrage_Click);
             // 
+            // chkBxBase
+            // 
+            this.chkBxBase.AutoSize = true;
+            this.chkBxBase.Location = new System.Drawing.Point(12, 298);
+            this.chkBxBase.Name = "chkBxBase";
+            this.chkBxBase.Size = new System.Drawing.Size(78, 17);
+            this.chkBxBase.TabIndex = 5;
+            this.chkBxBase.Text = "Base seule";
+            this.chkBxBase.UseVisualStyleBackColor = true;
+            this.chkBxBase.CheckedChanged += new System.EventHandler(this.chkBxBase_CheckedChanged);
+            // 
             // Form1
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(621, 350);
+            this.ClientSize = new System.Drawing.Size(621, 370);
+            this.Controls.Add(this.chkBxBase);
             this.Controls.Add(this.buttonDemarrage);
             this.Controls.Add(this.comboBoxBaseClient);
             this.Controls.Add(this.comboBoxBaseServeur);
@@ -254,6 +267,7 @@
         private System.Windows.Forms.Label label7;
         private System.Windows.Forms.ComboBox comboBoxBaseClient;
         private System.Windows.Forms.Button buttonDemarrage;
+        private System.Windows.Forms.CheckBox chkBxBase;
     }
 }
 
