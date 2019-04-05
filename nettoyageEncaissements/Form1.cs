@@ -554,58 +554,72 @@ namespace nettoyageEncaissements
 
                         i = 0;
 
-                        // Tant qu'il y a des données retournées par la requête
-                        while (retourRequetes.Read())
+                        if (retourRequetes.Read() == false)
                         {
-                            // Objet
-                            listAffairesClient.Add(new Affaire(int.Parse(retourRequetes["ID"].ToString()), retourRequetes["TYPEDOC"].ToString(), double.Parse(retourRequetes["ACOMPTE"].ToString()), retourRequetes["UID"].ToString(), retourRequetes["NUMAFF"].ToString()));
-
-                            // Procédure
-                            //Array.Resize(ref tabAffairesClient, tabAffairesClient.Length + 1);
-                            //tabAffairesClient[i] = retourRequetes["UID"].ToString();
-
-                            switch (retourRequetes["TYPEDOC"].ToString())
+                            libelleTemp = "KO";
+                        }
+                        else
+                        {
+                            // Tant qu'il y a des données retournées par la requête
+                            while (retourRequetes.Read())
                             {
-                                case "F":
-                                    libelleTemp = "Facture n° " + retourRequetes["NUMAFF"].ToString() + " identifiée";
-                                    break;
-                                case "A":
-                                    libelleTemp = "Facture archivée n° " + retourRequetes["NUMAFF"].ToString() + " identifiée";
-                                    break;
-                                case "B":
-                                    libelleTemp = "Bon de livraison n° " + retourRequetes["NUMAFF"].ToString() + " identifié";
-                                    break;
-                                case "L":
-                                    libelleTemp = "Bon de livraison archivé n° " + retourRequetes["NUMAFF"].ToString() + " identifié";
-                                    break;
-                                case "C":
-                                    libelleTemp = "Commande n° " + retourRequetes["NUMAFF"].ToString() + " identifiée";
-                                    break;
-                                case "M":
-                                    libelleTemp = "Commande archivée n° " + retourRequetes["NUMAFF"].ToString() + " identifiée";
-                                    break;
-                                case "D":
-                                    libelleTemp = "Devis n° " + retourRequetes["NUMAFF"].ToString() + " identifié";
-                                    break;
-                                case "W":
-                                    libelleTemp = "Devis archivé n° " + retourRequetes["NUMAFF"].ToString() + " identifié";
-                                    break;
-                                default:
-                                    break;
-                            }
-                            monFicLog.Log(libelleTemp + " comme ayant un encaissement de trop sur la base client.", ficLog);
+                                // Objet
+                                listAffairesClient.Add(new Affaire(int.Parse(retourRequetes["ID"].ToString()), retourRequetes["TYPEDOC"].ToString(), double.Parse(retourRequetes["ACOMPTE"].ToString()), retourRequetes["UID"].ToString(), retourRequetes["NUMAFF"].ToString()));
 
-                            i++;
+                                // Procédure
+                                //Array.Resize(ref tabAffairesClient, tabAffairesClient.Length + 1);
+                                //tabAffairesClient[i] = retourRequetes["UID"].ToString();
+
+                                switch (retourRequetes["TYPEDOC"].ToString())
+                                {
+                                    case "F":
+                                        libelleTemp = "Facture n° " + retourRequetes["NUMAFF"].ToString() + " identifiée";
+                                        break;
+                                    case "A":
+                                        libelleTemp = "Facture archivée n° " + retourRequetes["NUMAFF"].ToString() + " identifiée";
+                                        break;
+                                    case "B":
+                                        libelleTemp = "Bon de livraison n° " + retourRequetes["NUMAFF"].ToString() + " identifié";
+                                        break;
+                                    case "L":
+                                        libelleTemp = "Bon de livraison archivé n° " + retourRequetes["NUMAFF"].ToString() + " identifié";
+                                        break;
+                                    case "C":
+                                        libelleTemp = "Commande n° " + retourRequetes["NUMAFF"].ToString() + " identifiée";
+                                        break;
+                                    case "M":
+                                        libelleTemp = "Commande archivée n° " + retourRequetes["NUMAFF"].ToString() + " identifiée";
+                                        break;
+                                    case "D":
+                                        libelleTemp = "Devis n° " + retourRequetes["NUMAFF"].ToString() + " identifié";
+                                        break;
+                                    case "W":
+                                        libelleTemp = "Devis archivé n° " + retourRequetes["NUMAFF"].ToString() + " identifié";
+                                        break;
+                                    default:
+                                        break;
+                                }
+                                monFicLog.Log(libelleTemp + " comme ayant un encaissement de trop sur la base client.", ficLog);
+
+                                i++;
+                            }
                         }
                     }
 
                     retourRequetes.Close();
                 }
+
+                if (libelleTemp == "KO")
+                {
+                    monFicLog.Log("Aucun défaut sur la base principale "+ comboBoxBaseServeur.Text, ficLog);
+                    MessageBox.Show("Aucun défaut sur la base " + comboBoxBaseServeur.Text);
+                    return;
+                }
             }
 
             /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
             ///
-            /// Si l'utilisateur n'a pas cochée la base, il est également nécessaire de lister les affaires en erreurs côté base serveur
+            /// Si l'utilisateur n'a pas cochée la case, il est également nécessaire de lister les affaires en erreurs côté base serveur
             /// 
             /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -726,7 +740,6 @@ namespace nettoyageEncaissements
 
                                 i++;
                             }
-
                             retourRequetes.Close();
                         }
                     }
@@ -1317,6 +1330,7 @@ namespace nettoyageEncaissements
                                                 if (i == -1)
                                                 {
                                                     monFicLog.Log("Aucun encaissement à supprimer en seconde phase sur la base serveur " + comboBoxBaseServeur.Text + " pour l'affaire " + affaire.numaff + " de type " + typeAff, ficLog);
+                                                    MessageBox.Show("Aucun encaissement à supprimer sur la base serveur " + comboBoxBaseServeur.Text);
                                                 }
                                             }
                                         }
