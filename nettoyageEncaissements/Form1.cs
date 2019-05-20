@@ -489,12 +489,12 @@ namespace nettoyageEncaissements
                         WHERE ca.netapayer < 0
                         AND ca.accompte = (SELECT SUM(montant) FROM encaissement e WHERE e.doc_id = ca.id_cde_arch AND type_doc like 'M')
                         UNION
-                        SELECT d.id_devis AS ID, 'M' AS TYPEDOC, d.numdoc AS NUMAFF, d.accompte AS ACOMPTE, d.uid AS UID
+                        SELECT d.id_devis AS ID, 'D' AS TYPEDOC, d.numdoc AS NUMAFF, d.accompte AS ACOMPTE, d.uid AS UID
                         FROM devis d
                         WHERE d.netapayer < 0
                         AND d.accompte = (SELECT SUM(montant) FROM encaissement e WHERE e.doc_id = d.id_devis AND type_doc like 'D')
                         UNION
-                        SELECT da.id_devis_arch AS ID, 'M' AS TYPEDOC, da.numdoc AS NUMAFF, da.accompte AS ACOMPTE, da.uid AS UID
+                        SELECT da.id_devis_arch AS ID, 'W' AS TYPEDOC, da.numdoc AS NUMAFF, da.accompte AS ACOMPTE, da.uid AS UID
                         FROM devis_arch da
                         WHERE da.netapayer < 0
                         AND da.accompte = (SELECT SUM(montant) FROM encaissement e WHERE e.doc_id = da.id_devis_arch AND type_doc like 'W')";
@@ -554,55 +554,48 @@ namespace nettoyageEncaissements
 
                         i = 0;
 
-                        if (retourRequetes.Read() == false)
+                        // Tant qu'il y a des données retournées par la requête
+                        while (retourRequetes.Read())
                         {
-                            libelleTemp = "KO";
-                        }
-                        else
-                        {
-                            // Tant qu'il y a des données retournées par la requête
-                            while (retourRequetes.Read())
+                            // Objet
+                            listAffairesClient.Add(new Affaire(int.Parse(retourRequetes["ID"].ToString()), retourRequetes["TYPEDOC"].ToString(), double.Parse(retourRequetes["ACOMPTE"].ToString()), retourRequetes["UID"].ToString(), retourRequetes["NUMAFF"].ToString()));
+
+                            // Procédure
+                            //Array.Resize(ref tabAffairesClient, tabAffairesClient.Length + 1);
+                            //tabAffairesClient[i] = retourRequetes["UID"].ToString();
+
+                            switch (retourRequetes["TYPEDOC"].ToString())
                             {
-                                // Objet
-                                listAffairesClient.Add(new Affaire(int.Parse(retourRequetes["ID"].ToString()), retourRequetes["TYPEDOC"].ToString(), double.Parse(retourRequetes["ACOMPTE"].ToString()), retourRequetes["UID"].ToString(), retourRequetes["NUMAFF"].ToString()));
-
-                                // Procédure
-                                //Array.Resize(ref tabAffairesClient, tabAffairesClient.Length + 1);
-                                //tabAffairesClient[i] = retourRequetes["UID"].ToString();
-
-                                switch (retourRequetes["TYPEDOC"].ToString())
-                                {
-                                    case "F":
-                                        libelleTemp = "Facture n° " + retourRequetes["NUMAFF"].ToString() + " identifiée";
-                                        break;
-                                    case "A":
-                                        libelleTemp = "Facture archivée n° " + retourRequetes["NUMAFF"].ToString() + " identifiée";
-                                        break;
-                                    case "B":
-                                        libelleTemp = "Bon de livraison n° " + retourRequetes["NUMAFF"].ToString() + " identifié";
-                                        break;
-                                    case "L":
-                                        libelleTemp = "Bon de livraison archivé n° " + retourRequetes["NUMAFF"].ToString() + " identifié";
-                                        break;
-                                    case "C":
-                                        libelleTemp = "Commande n° " + retourRequetes["NUMAFF"].ToString() + " identifiée";
-                                        break;
-                                    case "M":
-                                        libelleTemp = "Commande archivée n° " + retourRequetes["NUMAFF"].ToString() + " identifiée";
-                                        break;
-                                    case "D":
-                                        libelleTemp = "Devis n° " + retourRequetes["NUMAFF"].ToString() + " identifié";
-                                        break;
-                                    case "W":
-                                        libelleTemp = "Devis archivé n° " + retourRequetes["NUMAFF"].ToString() + " identifié";
-                                        break;
-                                    default:
-                                        break;
-                                }
-                                monFicLog.Log(libelleTemp + " comme ayant un encaissement de trop sur la base client.", ficLog);
-
-                                i++;
+                                case "F":
+                                    libelleTemp = "Facture n° " + retourRequetes["NUMAFF"].ToString() + " identifiée";
+                                    break;
+                                case "A":
+                                    libelleTemp = "Facture archivée n° " + retourRequetes["NUMAFF"].ToString() + " identifiée";
+                                    break;
+                                case "B":
+                                    libelleTemp = "Bon de livraison n° " + retourRequetes["NUMAFF"].ToString() + " identifié";
+                                    break;
+                                case "L":
+                                    libelleTemp = "Bon de livraison archivé n° " + retourRequetes["NUMAFF"].ToString() + " identifié";
+                                    break;
+                                case "C":
+                                    libelleTemp = "Commande n° " + retourRequetes["NUMAFF"].ToString() + " identifiée";
+                                    break;
+                                case "M":
+                                    libelleTemp = "Commande archivée n° " + retourRequetes["NUMAFF"].ToString() + " identifiée";
+                                    break;
+                                case "D":
+                                    libelleTemp = "Devis n° " + retourRequetes["NUMAFF"].ToString() + " identifié";
+                                    break;
+                                case "W":
+                                    libelleTemp = "Devis archivé n° " + retourRequetes["NUMAFF"].ToString() + " identifié";
+                                    break;
+                                default:
+                                    break;
                             }
+                            monFicLog.Log(libelleTemp + " comme ayant un encaissement de trop sur la base client.", ficLog);
+
+                            i++;
                         }
                     }
 
@@ -1172,175 +1165,282 @@ namespace nettoyageEncaissements
 
                                 string requeteSuppressionEncaissement = "";
                                 string requeteSuppressionEncaissementRecordLog = "";
+                                string requeteMAJAcompte = "";
                                 string idEncaissement = "";
 
                                 while (retourRequetes.Read())
                                 {
                                     requeteSuppressionEncaissement = "DELETE FROM encaissement WHERE id_encaissement = " + retourRequetes["ID"].ToString();
                                     requeteSuppressionEncaissementRecordLog = "DELETE FROM record_log WHERE record_id = " + retourRequetes["ID"].ToString();
+                                    switch (affaire.type)
+                                    {
+                                        case "D":
+                                            requeteMAJAcompte = "UPDATE devis SET accompte=(SELECT SUM(montant) FROM encaissement WHERE doc_id = " + affaire.id + " and type_doc = 'D'), netapayer = (totalttc - (SELECT SUM(montant) FROM encaissement WHERE doc_id = " + affaire.id + " and type_doc = 'D')) WHERE id_devis = " + affaire.id;
+                                            break;
+                                        case "W":
+                                            requeteMAJAcompte = "UPDATE devis_arch SET accompte=(SELECT SUM(montant) FROM encaissement WHERE doc_id = " + affaire.id + " and type_doc = 'W'), netapayer = (totalttc - (SELECT SUM(montant) FROM encaissement WHERE doc_id = " + affaire.id + " and type_doc = 'W')) WHERE id_devis_arch = " + affaire.id;
+                                            break;
+                                        case "C":
+                                            requeteMAJAcompte = "UPDATE cde SET accompte=(SELECT SUM(montant) FROM encaissement WHERE doc_id = " + affaire.id + " and type_doc = 'C'), netapayer = (totalttc - (SELECT SUM(montant) FROM encaissement WHERE doc_id = " + affaire.id + " and type_doc = 'C')) WHERE id_cde = " + affaire.id;
+                                            break;
+                                        case "M":
+                                            requeteMAJAcompte = "UPDATE cde_arch SET accompte=(SELECT SUM(montant) FROM encaissement WHERE doc_id = " + affaire.id + " and type_doc = 'M'), netapayer = (totalttc - (SELECT SUM(montant) FROM encaissement WHERE doc_id = " + affaire.id + " and type_doc = 'M')) WHERE id_cde_arch = " + affaire.id;
+                                            break;
+                                        case "B":
+                                            requeteMAJAcompte = "UPDATE bonliv SET accompte=(SELECT SUM(montant) FROM encaissement WHERE doc_id = " + affaire.id + " and type_doc = 'B'), netapayer = (totalttc - (SELECT SUM(montant) FROM encaissement WHERE doc_id = " + affaire.id + " and type_doc = 'B'))  WHERE id_bonliv = " + affaire.id;
+                                            break;
+                                        case "L":
+                                            requeteMAJAcompte = "UPDATE bonliv_arch SET accompte=(SELECT SUM(montant) FROM encaissement WHERE doc_id = " + affaire.id + " and type_doc = 'L'), netapayer = (totalttc - (SELECT SUM(montant) FROM encaissement WHERE doc_id = " + affaire.id + " and type_doc = 'L')) WHERE id_bonliv_arch = " + affaire.id;
+                                            break;
+                                        case "F":
+                                            requeteMAJAcompte = "UPDATE facture SET accompte=(SELECT SUM(montant) FROM encaissement WHERE doc_id = " + affaire.id + " and type_doc = 'F'), netapayer = (totalttc - (SELECT SUM(montant) FROM encaissement WHERE doc_id = " + affaire.id + " and type_doc = 'F'))  WHERE id_facture = " + affaire.id;
+                                            break;
+                                        case "A":
+                                            requeteMAJAcompte = "UPDATE facture_arch SET accompte=(SELECT SUM(montant) FROM encaissement WHERE doc_id = " + affaire.id + " and type_doc = 'A'), netapayer = (totalttc - (SELECT SUM(montant) FROM encaissement WHERE doc_id = " + affaire.id + " and type_doc = 'A'))  WHERE id_facture_arch = " + affaire.id;
+                                            break;
+                                        default:
+                                            break;
+                                    }
+
                                     idEncaissement = retourRequetes["ID"].ToString();
                                     listUidEncaissements.Add(retourRequetes["UID"].ToString());
+
+                                    using (chaineConnexionListeBases2 = new OdbcConnection(paramConnexion))
+                                    {
+                                        try
+                                        {
+                                            // Passage de la commande
+                                            mesRequetes2 = new OdbcCommand(requeteSuppressionEncaissement, chaineConnexionListeBases2);
+                                            // Ouverture
+                                            chaineConnexionListeBases2.Open();
+                                        }
+                                        catch (Exception ex)
+                                        {
+                                            monFicLog.Log("Erreur de connexion ODBC pour la suppression des encaissements côté serveur.", ficLog);
+                                            monFicLog.Log(ex.ToString(), ficLog);
+                                            mesTests = false;
+                                            MessageBox.Show("Erreur à la connexion à la base serveur pour la suppression des encaissements.");
+                                        }
+                                        finally
+                                        {
+                                            if (mesTests)
+                                            {
+                                                int nbElemSupp = 0;
+
+                                                try
+                                                {
+                                                    nbElemSupp = mesRequetes2.ExecuteNonQuery();
+                                                }
+                                                catch (Exception ex)
+                                                {
+                                                    monFicLog.Log("Erreur lors de la tentative de suppression de l'encaissement identifié " + idEncaissement + " sur la base serveur " + comboBoxBaseServeur.Text, ficLog);
+                                                    monFicLog.Log(ex.ToString(), ficLog);
+                                                    mesTests = false;
+                                                    MessageBox.Show("Erreur à la suppression d'un encaissement sur la base serveur.");
+                                                }
+                                                finally
+                                                {
+                                                    string typeAff = "";
+                                                    switch (affaire.type)
+                                                    {
+                                                        case "D":
+                                                            typeAff = "devis";
+                                                            break;
+                                                        case "W":
+                                                            typeAff = "devis archivé";
+                                                            break;
+                                                        case "C":
+                                                            typeAff = "commande";
+                                                            break;
+                                                        case "M":
+                                                            typeAff = "commande archivée";
+                                                            break;
+                                                        case "B":
+                                                            typeAff = "bon de livraison";
+                                                            break;
+                                                        case "L":
+                                                            typeAff = "bon de livraison archivé";
+                                                            break;
+                                                        case "F":
+                                                            typeAff = "facture";
+                                                            break;
+                                                        case "A":
+                                                            typeAff = "facture archivée";
+                                                            break;
+                                                        default:
+                                                            break;
+                                                    }
+
+                                                    if (nbElemSupp == -1)
+                                                    {
+                                                        monFicLog.Log("Aucun encaissement à supprimer sur la base serveur " + comboBoxBaseServeur.Text + " pour l'affaire " + affaire.numaff + " de type " + typeAff, ficLog);
+                                                    }
+                                                    else
+                                                    {
+                                                        monFicLog.Log("Suppression de l'encaissement d'id " + idEncaissement + "dans la base serveur " + comboBoxBaseServeur.Text + " pour l'affaire " + affaire.numaff + " de type " + typeAff, ficLog);
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    using (chaineConnexionListeBases2 = new OdbcConnection(paramConnexion))
+                                    {
+                                        try
+                                        {
+                                            // Passage de la commande
+                                            mesRequetes2 = new OdbcCommand(requeteSuppressionEncaissementRecordLog, chaineConnexionListeBases2);
+                                            // Ouverture
+                                            chaineConnexionListeBases2.Open();
+                                        }
+                                        catch (Exception ex)
+                                        {
+                                            monFicLog.Log("Erreur de connexion ODBC pour la seconde phase de suppression des encaissements côté serveur.", ficLog);
+                                            monFicLog.Log(ex.ToString(), ficLog);
+                                            mesTests = false;
+                                            MessageBox.Show("Erreur à la connexion à la base serveur lors de la seconde phase de suppression des encaissements.");
+                                        }
+                                        finally
+                                        {
+                                            if (mesTests)
+                                            {
+                                                try
+                                                {
+                                                    i = mesRequetes2.ExecuteNonQuery();
+                                                }
+                                                catch (Exception ex)
+                                                {
+                                                    monFicLog.Log("Erreur de connexion ODBC lors de la tentative de suppression de l'encaissement identifié " + idEncaissement + " sur la base serveur " + comboBoxBaseServeur.Text, ficLog);
+                                                    monFicLog.Log(ex.ToString(), ficLog);
+                                                    mesTests = false;
+                                                    MessageBox.Show("Erreur à la suppression d'un encaissement sur la base serveur.");
+                                                }
+                                                finally
+                                                {
+                                                    string typeAff = "";
+                                                    switch (affaire.type)
+                                                    {
+                                                        case "D":
+                                                            typeAff = "devis";
+                                                            break;
+                                                        case "W":
+                                                            typeAff = "devis archivé";
+                                                            break;
+                                                        case "C":
+                                                            typeAff = "commande";
+                                                            break;
+                                                        case "M":
+                                                            typeAff = "commande archivée";
+                                                            break;
+                                                        case "B":
+                                                            typeAff = "bon de livraison";
+                                                            break;
+                                                        case "L":
+                                                            typeAff = "bon de livraison archivé";
+                                                            break;
+                                                        case "F":
+                                                            typeAff = "facture";
+                                                            break;
+                                                        case "A":
+                                                            typeAff = "facture archivée";
+                                                            break;
+                                                        default:
+                                                            break;
+                                                    }
+
+                                                    if (i == -1)
+                                                    {
+                                                        monFicLog.Log("Aucun encaissement à supprimer en seconde phase sur la base serveur " + comboBoxBaseServeur.Text + " pour l'affaire " + affaire.numaff + " de type " + typeAff, ficLog);
+                                                        MessageBox.Show("Aucun encaissement à supprimer sur la base serveur " + comboBoxBaseServeur.Text);
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    using (chaineConnexionListeBases2 = new OdbcConnection(paramConnexion))
+                                    {
+                                        try
+                                        {
+                                            // Passage de la commande
+                                            mesRequetes2 = new OdbcCommand(requeteMAJAcompte, chaineConnexionListeBases2);
+                                            // Ouverture
+                                            chaineConnexionListeBases2.Open();
+                                        }
+                                        catch (Exception ex)
+                                        {
+                                            monFicLog.Log("Erreur de connexion ODBC pour la phase de mise à jour des acomptes côté serveur.", ficLog);
+                                            monFicLog.Log(ex.ToString(), ficLog);
+                                            mesTests = false;
+                                            MessageBox.Show("Erreur à la connexion à la base serveur lors de la phase de mise à jour des acomptes.");
+                                        }
+                                        finally
+                                        {
+                                            if (mesTests)
+                                            {
+                                                try
+                                                {
+                                                    i = mesRequetes2.ExecuteNonQuery();
+                                                }
+                                                catch (Exception ex)
+                                                {
+                                                    monFicLog.Log("Erreur de connexion ODBC lors de la tentative de mise à jour des l'acompte de l'affaire " + affaire.numaff + " de type " + affaire.type +" sur la base serveur " + comboBoxBaseServeur.Text, ficLog);
+                                                    monFicLog.Log(ex.ToString(), ficLog);
+                                                    mesTests = false;
+                                                    MessageBox.Show("Erreur à la mise à jour d'un acompte sur la base serveur.");
+                                                }
+                                                finally
+                                                {
+                                                    string typeAff = "";
+                                                    switch (affaire.type)
+                                                    {
+                                                        case "D":
+                                                            typeAff = "devis";
+                                                            break;
+                                                        case "W":
+                                                            typeAff = "devis archivé";
+                                                            break;
+                                                        case "C":
+                                                            typeAff = "commande";
+                                                            break;
+                                                        case "M":
+                                                            typeAff = "commande archivée";
+                                                            break;
+                                                        case "B":
+                                                            typeAff = "bon de livraison";
+                                                            break;
+                                                        case "L":
+                                                            typeAff = "bon de livraison archivé";
+                                                            break;
+                                                        case "F":
+                                                            typeAff = "facture";
+                                                            break;
+                                                        case "A":
+                                                            typeAff = "facture archivée";
+                                                            break;
+                                                        default:
+                                                            break;
+                                                    }
+
+                                                    if (i == -1)
+                                                    {
+                                                        monFicLog.Log("Aucun encaissement à supprimer en seconde phase sur la base serveur " + comboBoxBaseServeur.Text + " pour l'affaire " + affaire.numaff + " de type " + typeAff, ficLog);
+                                                        MessageBox.Show("Aucun encaissement à supprimer sur la base serveur " + comboBoxBaseServeur.Text);
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
 
                                 retourRequetes.Close();
-
-                                using (chaineConnexionListeBases = new OdbcConnection(paramConnexion))
-                                {
-                                    try
-                                    {
-                                        // Passage de la commande
-                                        mesRequetes = new OdbcCommand(requeteSuppressionEncaissement, chaineConnexionListeBases);
-                                        // Ouverture
-                                        chaineConnexionListeBases.Open();
-                                    }
-                                    catch (Exception ex)
-                                    {
-                                        monFicLog.Log("Erreur de connexion ODBC pour la suppression des encaissements côté serveur.", ficLog);
-                                        monFicLog.Log(ex.ToString(), ficLog);
-                                        mesTests = false;
-                                        MessageBox.Show("Erreur à la connexion à la base serveur pour la suppression des encaissements.");
-                                    }
-                                    finally
-                                    {
-                                        if (mesTests)
-                                        {
-                                            int nbElemSupp = 0;
-
-                                            try
-                                            {
-                                                nbElemSupp = mesRequetes.ExecuteNonQuery();
-                                            }
-                                            catch (Exception ex)
-                                            {
-                                                monFicLog.Log("Erreur lors de la tentative de suppression de l'encaissement identifié " + idEncaissement + " sur la base serveur " + comboBoxBaseServeur.Text, ficLog);
-                                                monFicLog.Log(ex.ToString(), ficLog);
-                                                mesTests = false;
-                                                MessageBox.Show("Erreur à la suppression d'un encaissement sur la base serveur.");
-                                            }
-                                            finally
-                                            {
-                                                string typeAff = "";
-                                                switch (affaire.type)
-                                                {
-                                                    case "D":
-                                                        typeAff = "devis";
-                                                        break;
-                                                    case "W":
-                                                        typeAff = "devis archivé";
-                                                        break;
-                                                    case "C":
-                                                        typeAff = "commande";
-                                                        break;
-                                                    case "M":
-                                                        typeAff = "commande archivée";
-                                                        break;
-                                                    case "B":
-                                                        typeAff = "bon de livraison";
-                                                        break;
-                                                    case "L":
-                                                        typeAff = "bon de livraison archivé";
-                                                        break;
-                                                    case "F":
-                                                        typeAff = "facture";
-                                                        break;
-                                                    case "A":
-                                                        typeAff = "facture archivée";
-                                                        break;
-                                                    default:
-                                                        break;
-                                                }
-
-                                                if (nbElemSupp == -1)
-                                                {
-                                                    monFicLog.Log("Aucun encaissement à supprimer sur la base serveur " + comboBoxBaseServeur.Text + " pour l'affaire " + affaire.numaff + " de type " + typeAff, ficLog);
-                                                }
-                                                else
-                                                {
-                                                    monFicLog.Log("Suppression de l'encaissement d'id " + idEncaissement + "dans la base serveur " + comboBoxBaseServeur.Text + " pour l'affaire " + affaire.numaff + " de type " + typeAff, ficLog);
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-
-                                using (chaineConnexionListeBases = new OdbcConnection(paramConnexion))
-                                {
-                                    try
-                                    {
-                                        // Passage de la commande
-                                        mesRequetes = new OdbcCommand(requeteSuppressionEncaissementRecordLog, chaineConnexionListeBases);
-                                        // Ouverture
-                                        chaineConnexionListeBases.Open();
-                                    }
-                                    catch (Exception ex)
-                                    {
-                                        monFicLog.Log("Erreur de connexion ODBC pour la seconde phase de suppression des encaissements côté serveur.", ficLog);
-                                        monFicLog.Log(ex.ToString(), ficLog);
-                                        mesTests = false;
-                                        MessageBox.Show("Erreur à la connexion à la base serveur lors de la seconde phase de suppression des encaissements.");
-                                    }
-                                    finally
-                                    {
-                                        if (mesTests)
-                                        {
-                                            try
-                                            {
-                                                i = mesRequetes.ExecuteNonQuery();
-                                            }
-                                            catch (Exception ex)
-                                            {
-                                                monFicLog.Log("Erreur de connexion ODBC lors de la tentative de suppression de l'encaissement identifié " + idEncaissement + " sur la base serveur " + comboBoxBaseServeur.Text, ficLog);
-                                                monFicLog.Log(ex.ToString(), ficLog);
-                                                mesTests = false;
-                                                MessageBox.Show("Erreur à la suppression d'un encaissement sur la base serveur.");
-                                            }
-                                            finally
-                                            {
-                                                string typeAff = "";
-                                                switch (affaire.type)
-                                                {
-                                                    case "D":
-                                                        typeAff = "devis";
-                                                        break;
-                                                    case "W":
-                                                        typeAff = "devis archivé";
-                                                        break;
-                                                    case "C":
-                                                        typeAff = "commande";
-                                                        break;
-                                                    case "M":
-                                                        typeAff = "commande archivée";
-                                                        break;
-                                                    case "B":
-                                                        typeAff = "bon de livraison";
-                                                        break;
-                                                    case "L":
-                                                        typeAff = "bon de livraison archivé";
-                                                        break;
-                                                    case "F":
-                                                        typeAff = "facture";
-                                                        break;
-                                                    case "A":
-                                                        typeAff = "facture archivée";
-                                                        break;
-                                                    default:
-                                                        break;
-                                                }
-
-                                                if (i == -1)
-                                                {
-                                                    monFicLog.Log("Aucun encaissement à supprimer en seconde phase sur la base serveur " + comboBoxBaseServeur.Text + " pour l'affaire " + affaire.numaff + " de type " + typeAff, ficLog);
-                                                    MessageBox.Show("Aucun encaissement à supprimer sur la base serveur " + comboBoxBaseServeur.Text);
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
                             }
                         }
                     }
                 }
             }
+
+            MessageBox.Show("Traitement terminé");
         }
 
         private void chkBxBase_CheckedChanged(object sender, EventArgs e)
